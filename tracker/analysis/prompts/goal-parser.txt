@@ -1,0 +1,25 @@
+Parse the following free-text goal input into a structured list of goals for the day.
+
+The user's projects and team:
+{user_projects_section}
+
+Input:
+{raw_goals}
+
+Return a JSON array. No prose outside the JSON. No markdown fences.
+
+Each item:
+{
+  "description": "<clear goal description>",
+  "project": "<one of the user's project names above, or 'personal' or null>",
+  "estimated_minutes": <int or null>,
+  "target_start_time": "<HH:MM:SS or null>"
+}
+
+Rules:
+- Extract time mentions: "10:30", "after lunch", "1 hour" → estimated_minutes: 60
+- Infer project from the user's project keywords listed above
+- If no time estimate given, set null
+- Split compound goals into separate items
+- Keep descriptions specific, not generic
+- Maximum 8 goals per day

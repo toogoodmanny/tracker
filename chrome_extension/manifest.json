@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "Tracker — Personal Time Tracker",
+  "version": "0.1.0",
+  "description": "Sends tab URL, page title, and YouTube video titles to the local tracker daemon.",
+
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "scripting",
+    "storage",
+    "webNavigation"
+  ],
+
+  "host_permissions": [
+    "http://localhost:27182/*",
+    "<all_urls>"
+  ],
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["content_youtube.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content_pagetext.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "action": {
+    "default_title": "Tracker active"
+  }
+}

@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtualenv
+.venv/
+venv/
+env/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.cache
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Tracker data — NEVER commit these
+.tracker/
+~/.tracker/
+**/.tracker/
+*.db
+*.db-shm
+*.db-wal
+config.json
+secrets.json
+.env
+.env.*
+
+# Raw LLM responses + reports may contain personal data
+raw_responses/
+reports/
+screenshots/
+goals/
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Chrome extension build artifacts
+chrome_extension/dist/
+
+# Local notes / scratch
+TODO.local.md
+NOTES.local.md
+*.local.md

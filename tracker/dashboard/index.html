@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tracker — Live</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f5f5f0; color: #1a1a1a; line-height: 1.5;
+    padding: 2rem; max-width: 1100px; margin: 0 auto;
+  }
+  h1 { font-size: 1.4rem; font-weight: 500; margin-bottom: 0.25rem; }
+  h2 { font-size: 0.95rem; font-weight: 500; color: #555; margin: 1.25rem 0 0.5rem; }
+  .meta { font-size: 0.8rem; color: #888; margin-bottom: 1rem; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 999px;
+          font-size: 0.7rem; letter-spacing: .04em; text-transform: uppercase; }
+  .pill-on  { background: #1d9e7522; color: #1d7d5e; }
+  .pill-off { background: #e24b4a22; color: #b03a39; }
+  .card { background: #fff; border: 0.5px solid #e0e0d8; border-radius: 8px;
+          padding: 1rem 1.25rem; margin-bottom: 1rem; }
+  textarea, input[type=text] {
+    width: 100%; font: inherit; font-size: 0.9rem; padding: 0.6rem 0.75rem;
+    border: 0.5px solid #d8d8d0; border-radius: 6px; background: #fafaf7; outline: none;
+  }
+  textarea:focus, input[type=text]:focus { border-color: #6c6c6c; background: #fff; }
+  textarea { resize: vertical; min-height: 70px; font-family: inherit; }
+  button {
+    font: inherit; font-size: 0.82rem; padding: 0.45rem 0.9rem;
+    border: 0.5px solid #c8c8b8; background: #fff; border-radius: 6px;
+    cursor: pointer; color: #333;
+  }
+  button:hover { background: #f0efe6; }
+  button.primary { background: #1d9e75; color: #fff; border-color: #1d9e75; }
+  button.primary:hover { background: #178663; }
+  button.primary.saved { background: #128a5e; border-color: #128a5e; pointer-events: none; }
+  button.primary.error { background: #e24b4a; border-color: #e24b4a; }
+  button.subtle { background: transparent; border: none; color: #aaa; padding: 2px 6px; }
+  button.subtle:hover { color: #e24b4a; background: transparent; }
+  button.add-sg { font-size: 0.72rem; padding: 0.25rem 0.6rem; color: #888; border-color: #d8d8d0; }
+
+  .save-row { margin-top: 0.5rem; display: flex; align-items: center;
+              justify-content: flex-end; gap: 0.6rem; }
+  .save-status { font-size: 0.75rem; color: #888; min-height: 1em; }
+
+  .goal-block { margin-bottom: 1rem; }
+  .goal-block:last-child { margin-bottom: 0; }
+  .goal-block + .goal-block { padding-top: 0.75rem; border-top: 0.5px solid #f0efe6; }
+  .goal-title { font-weight: 500; font-size: 0.95rem; margin-bottom: 0.4rem; color: #1a1a1a; }
+  .goal-title.orphan { color: #888; font-style: italic; }
+  .sg-list { margin-left: 0.25rem; }
+  .sg-row { display: flex; align-items: center; gap: 0.5rem;
+            padding: 0.25rem 0; font-size: 0.86rem; }
+  .sg-row input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; }
+  .sg-row .desc { flex: 1; }
+  .sg-row .desc.done { color: #aaa; text-decoration: line-through; }
+  .sg-input-row { display: flex; gap: 0.4rem; margin-top: 0.4rem; margin-left: 0.25rem; }
+  .sg-input-row input[type=text] { flex: 1; font-size: 0.82rem; padding: 0.35rem 0.6rem; }
+
+  .block-row {
+    display: grid; grid-template-columns: 110px 130px 1fr; gap: 0.75rem;
+    padding: 0.55rem 0; border-bottom: 0.5px solid #f0efe6;
+    font-size: 0.85rem; align-items: start;
+  }
+  .block-row:last-child { border-bottom: none; }
+  .block-time { color: #888; font-variant-numeric: tabular-nums; }
+  .block-app  { color: #444; font-weight: 500; }
+  .block-app.locked { color: #999; font-weight: 400; font-style: italic; }
+  .block-titles { color: #555; font-size: 0.82rem; }
+  .block-titles .badges { color: #aaa; font-size: 0.72rem; margin-top: 2px; }
+  .empty { color: #aaa; font-size: 0.85rem; padding: 0.5rem 0; }
+  .stale { opacity: 0.5; }
+  .footer { margin-top: 2rem; color: #aaa; font-size: 0.75rem; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1 id="day-title">Tracker</h1>
+<p class="meta">
+  <span id="status-pill" class="pill pill-off">offline</span>
+  &nbsp;·&nbsp; <span id="snap-count">0 snapshots</span>
+  &nbsp;·&nbsp; updated <span id="updated-at">never</span>
+</p>
+
+<h2>Today's goals</h2>
+<div class="card">
+  <textarea id="goal-input" placeholder="One goal per line. e.g.&#10;10:30 - 1hr design intro screen&#10;13:00 - 2hrs write spec doc"></textarea>
+  <div class="save-row">
+    <span class="save-status" id="save-status"></span>
+    <button class="primary" id="save-goals">Save goals</button>
+  </div>
+</div>
+
+<h2>Plan & subgoals</h2>
+<div class="card" id="goals-with-subs">
+  <div class="empty">Save goals above, then break each one into subgoals here.</div>
+</div>
+
+<h2>
+  Timeline
+  <small style="font-weight:400;color:#aaa;font-size:0.75rem">
+    (one block per app session — refreshes when you switch apps)
+  </small>
+</h2>
+<div class="card" id="timeline">
+  <div class="empty">Waiting for data…</div>
+</div>
+
+<div class="footer">Tracker dashboard · auto-refreshes every 30s</div>
+
+<script>
+const POLL_MS = 30000;
+let lastTimelineFp = null;
+let lastGoalsFp = null;
+let lastRawGoal = null;
+let polling = false;
+
+async function api(method, path, body) {
+  const res = await fetch(path, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(method + ' ' + path + ' -> ' + res.status);
+  return res.json();
+}
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+function fmtDuration(mins) {
+  if (mins < 60) return mins + 'm';
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? h + 'h' : h + 'h ' + m + 'm';
+}
+
+function renderTimeline(blocks) {
+  const el = document.getElementById('timeline');
+  if (!blocks || blocks.length === 0) {
+    el.innerHTML = '<div class="empty">No activity yet — has the daemon started?</div>';
+    return;
+  }
+  // Newest first
+  const rows = blocks.slice().reverse().map(b => {
+    const titlesText = (b.titles || []).join(' · ') || '—';
+    const badges = [];
+    if (b.text_capture_count) badges.push('✏️ ' + b.text_capture_count);
+    if (b.screenshot_count) badges.push('📸 ' + b.screenshot_count);
+    if (b.url_count) badges.push('🔗 ' + b.url_count);
+    const badgeStr = badges.length ? '<div class="badges">' + badges.join(' · ') + '</div>' : '';
+    const appCls = (b.app === 'Locked' || b.app === 'AFK') ? 'block-app locked' : 'block-app';
+    return `<div class="block-row">
+      <span class="block-time">${b.start} – ${b.end} <span style="color:#bbb">(${fmtDuration(b.duration_minutes)})</span></span>
+      <span class="${appCls}">${escapeHtml(b.app)}</span>
+      <div class="block-titles">${escapeHtml(titlesText)}${badgeStr}</div>
+    </div>`;
+  }).join('');
+  el.innerHTML = rows;
+}
+
+function renderGoalsWithSubs(goalsWithSubs) {
+  const el = document.getElementById('goals-with-subs');
+  if (!goalsWithSubs || goalsWithSubs.length === 0) {
+    el.innerHTML = '<div class="empty">Save goals above, then break each one into subgoals here.</div>';
+    return;
+  }
+  el.innerHTML = goalsWithSubs.map(g => {
+    const isOrphan = !g.goal;
+    const titleHtml = isOrphan
+      ? '<div class="goal-title orphan">Other (no parent goal)</div>'
+      : '<div class="goal-title">' + escapeHtml(g.goal) + '</div>';
+    const subRows = (g.subgoals || []).map(sg => `
+      <div class="sg-row" data-id="${sg.id}">
+        <input type="checkbox" ${sg.done ? 'checked' : ''} class="sg-check">
+        <span class="desc ${sg.done ? 'done' : ''}">${escapeHtml(sg.description)}</span>
+        <button class="subtle sg-delete" title="Delete">✕</button>
+      </div>
+    `).join('') || '<div class="empty" style="font-size:0.78rem;padding:0.2rem 0">No steps yet.</div>';
+
+    const inputHtml = isOrphan ? '' : `
+      <div class="sg-input-row">
+        <input type="text" class="sg-new" data-parent="${escapeHtml(g.goal)}" placeholder="Add a step…">
+        <button class="add-sg" data-parent="${escapeHtml(g.goal)}">+ step</button>
+      </div>
+    `;
+    return `<div class="goal-block">
+      ${titleHtml}
+      <div class="sg-list">${subRows}</div>
+      ${inputHtml}
+    </div>`;
+  }).join('');
+
+  // Wire up handlers
+  el.querySelectorAll('.sg-check').forEach(cb => {
+    cb.addEventListener('change', async e => {
+      const id = e.target.closest('.sg-row').dataset.id;
+      try {
+        await api('PATCH', '/api/subgoals/' + id, { done: e.target.checked });
+        refresh(true);
+      } catch (err) { console.error(err); }
+    });
+  });
+  el.querySelectorAll('.sg-delete').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      const id = e.target.closest('.sg-row').dataset.id;
+      try {
+        await api('DELETE', '/api/subgoals/' + id);
+        refresh(true);
+      } catch (err) { console.error(err); }
+    });
+  });
+  el.querySelectorAll('.add-sg').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const parent = btn.dataset.parent;
+      const input = el.querySelector('.sg-new[data-parent="' + parent.replace(/"/g, '\\"') + '"]');
+      addSubgoal(parent, input);
+    });
+  });
+  el.querySelectorAll('.sg-new').forEach(inp => {
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') addSubgoal(inp.dataset.parent, inp);
+    });
+  });
+}
+
+async function addSubgoal(parent, inputEl) {
+  const desc = inputEl.value.trim();
+  if (!desc) return;
+  try {
+    await api('POST', '/api/subgoals', { description: desc, parent_goal: parent });
+    inputEl.value = '';
+    refresh(true);
+  } catch (err) { alert('Add failed: ' + err.message); }
+}
+
+function timelineFp(blocks) {
+  // Re-render only when blocks list changes — i.e. an app boundary moved.
+  return JSON.stringify((blocks || []).map(b =>
+    [b.app, b.start, b.end, b.duration_minutes,
+     b.text_capture_count, b.screenshot_count, b.url_count]));
+}
+
+function goalsFp(goalsWithSubs) {
+  return JSON.stringify((goalsWithSubs || []).map(g =>
+    [g.goal, (g.subgoals || []).map(s => [s.id, s.done, s.description])]));
+}
+
+async function refresh(force) {
+  if (polling) return;
+  polling = true;
+  try {
+    const state = await api('GET', '/api/state');
+    document.body.classList.remove('stale');
+
+    document.getElementById('day-title').textContent = state.day || 'Tracker';
+    const pill = document.getElementById('status-pill');
+    if (state.session_active) {
+      pill.textContent = 'tracking';
+      pill.className = 'pill pill-on';
+    } else {
+      pill.textContent = 'idle';
+      pill.className = 'pill pill-off';
+    }
+    document.getElementById('snap-count').textContent = (state.snapshot_count || 0) + ' snapshots';
+    document.getElementById('updated-at').textContent = new Date().toLocaleTimeString();
+
+    const goalInput = document.getElementById('goal-input');
+    if (state.goal_raw !== lastRawGoal && document.activeElement !== goalInput) {
+      goalInput.value = state.goal_raw || '';
+      lastRawGoal = state.goal_raw;
+    }
+
+    const tFp = timelineFp(state.timeline_blocks);
+    if (force || tFp !== lastTimelineFp) {
+      lastTimelineFp = tFp;
+      renderTimeline(state.timeline_blocks);
+    }
+
+    const gFp = goalsFp(state.goals_with_subs);
+    if (force || gFp !== lastGoalsFp) {
+      lastGoalsFp = gFp;
+      renderGoalsWithSubs(state.goals_with_subs);
+    }
+  } catch (err) {
+    document.body.classList.add('stale');
+    console.error(err);
+  } finally {
+    polling = false;
+  }
+}
+
+const saveBtn = document.getElementById('save-goals');
+const saveStatus = document.getElementById('save-status');
+
+function flashSaved() {
+  const original = saveBtn.textContent;
+  saveBtn.classList.remove('error');
+  saveBtn.classList.add('saved');
+  saveBtn.textContent = '✓ Saved';
+  saveStatus.textContent = 'Saved at ' + new Date().toLocaleTimeString();
+  setTimeout(() => {
+    saveBtn.classList.remove('saved');
+    saveBtn.textContent = original;
+  }, 1800);
+}
+
+function flashError(msg) {
+  saveBtn.classList.add('error');
+  saveBtn.textContent = '✗ Failed';
+  saveStatus.textContent = msg;
+  setTimeout(() => {
+    saveBtn.classList.remove('error');
+    saveBtn.textContent = 'Save goals';
+  }, 2500);
+}
+
+saveBtn.addEventListener('click', async () => {
+  const raw = document.getElementById('goal-input').value.trim();
+  if (!raw) {
+    flashError('Goal text is empty');
+    return;
+  }
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+  try {
+    await api('POST', '/api/goals', { raw_input: raw });
+    lastRawGoal = raw;
+    flashSaved();
+    refresh(true);
+  } catch (err) {
+    flashError(err.message);
+  } finally {
+    saveBtn.disabled = false;
+  }
+});
+
+refresh(true);
+setInterval(refresh, POLL_MS);
+</script>
+</body>
+</html>
