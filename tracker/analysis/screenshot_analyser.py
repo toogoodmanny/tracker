@@ -54,9 +54,13 @@ class ScreenshotAnalyser:
             )
         return path.read_text(encoding="utf-8")
 
-    def analyse_pending(self, limit: int = 50) -> ScreenshotAnalysisResult:
+    def analyse_pending(self, limit: int = 15) -> ScreenshotAnalysisResult:
         """
-        Analyse up to `limit` pending screenshots.
+        Analyse up to `limit` pending screenshots, with per-app dedup.
+
+        At most one screenshot per unique app is analysed — there's no value
+        in sending Claude 5 screenshots of VS Code. A second shot is allowed
+        only if the first was taken >30 minutes earlier (different context).
 
         Returns counts + token usage. Never raises.
         """
@@ -68,7 +72,19 @@ class ScreenshotAnalyser:
         if not pending:
             return ScreenshotAnalysisResult(0, 0, 0, 0)
 
-        pending = pending[:limit]
+        # Deduplicate: keep at most one screenshot per app (or two if >30 min apart)
+        deduped: list = []
+        seen_app: dict[str, float] = {}  # app → last analysed timestamp (epoch minutes)
+        for snap in pending:
+            app = snap.app_name or "unknown"
+            snap_minutes = snap.timestamp.timestamp() / 60.0
+            last_min = seen_app.get(app)
+            if last_min is None or (snap_minutes - last_min) > 30:
+                deduped.append(snap)
+                seen_app[app] = snap_minutes
+            # else: same app analysed recently, skip
+        pending = deduped[:limit]
+
         analysed = 0
         skipped = 0
         input_tokens = 0

@@ -54,6 +54,23 @@ class Daemon:
         self._poll_count = 0
         self._seen_apps: set[str] = set()
 
+        # Snapshot deduplication state
+        # Apps where every message matters — always save at full poll rate
+        self._HIGH_FREQ_APPS: frozenset[str] = frozenset({
+            "WhatsApp", "Telegram", "Signal", "Messages", "iMessage",
+            "Slack", "Discord", "Teams", "Microsoft Teams",
+            "Claude", "ChatGPT", "Notion",
+        })
+        # Per-app: character length of last saved text field sample
+        self._last_saved_text_len: dict[str, int] = {}
+        # Per-app: monotonic time of last saved snapshot
+        self._last_saved_time: dict[str, float] = {}
+        # Last saved app + title to detect switches
+        self._last_saved_app: str | None = None
+        self._last_saved_title: str | None = None
+        # Max gap before saving a "breadcrumb" even if nothing changed
+        self._BREADCRUMB_INTERVAL_S: float = 300.0  # 5 minutes
+
         # Phase 2 collectors
         self._text_sampler = TextFieldSampler(
             sample_chars=config.daemon.text_field_sample_chars
@@ -97,15 +114,22 @@ class Daemon:
             result = self._poll_once()
 
             if result.success and result.snapshot is not None:
-                try:
-                    self._db.snapshots.insert(result.snapshot)
-                    self._poll_count += 1
-                    self._check_for_observations(result.snapshot)
-                except Exception as exc:  # noqa: BLE001 — last resort, re-logged
-                    logger.error(
-                        "Unexpected error inserting snapshot (poll %d): %s",
-                        self._poll_count,
-                        exc,
+                if self._should_save(result.snapshot):
+                    try:
+                        self._db.snapshots.insert(result.snapshot)
+                        self._poll_count += 1
+                        self._update_save_state(result.snapshot)
+                        self._check_for_observations(result.snapshot)
+                    except Exception as exc:  # noqa: BLE001 — last resort, re-logged
+                        logger.error(
+                            "Unexpected error inserting snapshot (poll %d): %s",
+                            self._poll_count,
+                            exc,
+                        )
+                else:
+                    logger.debug(
+                        "Snapshot skipped (no new information): app=%s",
+                        result.snapshot.app_name,
                     )
             elif not result.success:
                 logger.debug("Poll failed: %s", result.error)
@@ -263,6 +287,62 @@ class Daemon:
                 self._db.observations.insert(obs)
             except Exception as exc:  # noqa: BLE001
                 logger.debug("Could not store screenshot observation: %s", exc)
+
+    # ------------------------------------------------------------------
+    # Snapshot deduplication
+    # ------------------------------------------------------------------
+
+    def _should_save(self, snapshot: Snapshot) -> bool:
+        """
+        Return True if this snapshot carries new information worth storing.
+
+        Always save when:
+        - First snapshot of the session
+        - App or window title changed (new activity)
+        - App is a high-frequency app (messaging, AI)
+        - AFK status
+        - No save for this app in > BREADCRUMB_INTERVAL_S (heartbeat)
+
+        Skip when:
+        - Same app + same title + text field hasn't grown by ≥ 400 chars
+        """
+        app = snapshot.app_name or ""
+
+        # Always save: first poll, AFK, app switch, or title change
+        if self._poll_count == 0:
+            return True
+        if snapshot.is_afk:
+            return True
+        if app != (self._last_saved_app or ""):
+            return True
+        if snapshot.window_title != self._last_saved_title:
+            return True
+
+        # High-frequency apps: always save
+        if app in self._HIGH_FREQ_APPS:
+            return True
+
+        # Heartbeat: save at least once per BREADCRUMB_INTERVAL_S per app
+        now_mono = time.monotonic()
+        last_time = self._last_saved_time.get(app, 0.0)
+        if now_mono - last_time >= self._BREADCRUMB_INTERVAL_S:
+            return True
+
+        # Skip if text field hasn't grown by ≥ 400 chars
+        current_len = len(snapshot.text_field_sample or "")
+        last_len = self._last_saved_text_len.get(app, 0)
+        if current_len - last_len >= 400:
+            return True
+
+        return False
+
+    def _update_save_state(self, snapshot: Snapshot) -> None:
+        """Update dedup state after a successful insert."""
+        app = snapshot.app_name or ""
+        self._last_saved_app = app
+        self._last_saved_title = snapshot.window_title
+        self._last_saved_time[app] = time.monotonic()
+        self._last_saved_text_len[app] = len(snapshot.text_field_sample or "")
 
     # ------------------------------------------------------------------
     # Observation filing

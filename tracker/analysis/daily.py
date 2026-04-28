@@ -86,9 +86,10 @@ class DailyAnalyser:
         try:
             analysis = self._parse_response(raw_response)
         except ValueError as exc:
-            raise ValueError(
-                f"{exc}\nRaw response saved to: {raw_path}"
-            ) from exc
+            # JSON parse failed — write a minimal fallback report so the user
+            # still sees SOMETHING and knows where the raw file is.
+            logger.warning("JSON parse failed: %s — writing fallback report", exc)
+            analysis = _make_fallback_analysis(raw_response, str(exc), raw_path)
 
         # Inject run stats so the HTML report can render them.
         analysis["_run_stats"] = dict(self._stats)
@@ -539,6 +540,37 @@ def _compute_capture_stats(snapshots: list[Snapshot]) -> dict[str, Any]:
         "snapshots_with_text": with_text,
         "snapshots_with_screenshot": with_screenshot,
         "per_app_capture": per_app,
+    }
+
+
+def _make_fallback_analysis(raw: str, error: str, raw_path: str) -> dict[str, Any]:
+    """
+    When JSON parsing fails, return a minimal analysis dict that still
+    renders a (partial) HTML report so the user sees something useful.
+    The raw LLM text is embedded so nothing is lost.
+    """
+    return {
+        "day_score": 0,
+        "score_reasoning": f"Report generation failed — could not parse LLM response.\nError: {error}",
+        "active_minutes": 0,
+        "deep_work_minutes": 0,
+        "drift_minutes": 0,
+        "rabbit_hole_minutes": 0,
+        "waste_of_time_minutes": 0,
+        "break_minutes": 0,
+        "afk_minutes": 0,
+        "narrative": (
+            f"<strong>⚠️ JSON parse failed.</strong> The raw Claude response is saved at:<br>"
+            f"<code>{raw_path}</code><br><br>"
+            f"Raw response preview:<br><pre style='font-size:0.78rem;white-space:pre-wrap'>"
+            f"{raw[:2000].replace('<', '&lt;').replace('>', '&gt;')}"
+            f"{'…' if len(raw) > 2000 else ''}</pre>"
+        ),
+        "timeline": [],
+        "drift_triggers": [],
+        "goals_comparison": [],
+        "_run_stats": {},
+        "_parse_error": True,
     }
 
 

@@ -567,8 +567,19 @@ def _run_daily_analysis(
             print_info(f"Open manually: {report_path}")
     except ValueError as exc:
         print_error(f"Analysis failed: {exc}")
+        print_info("Your session data is safe in ~/.tracker/tracker.db")
+        print_info("Re-run: track end --no-analysis, or try again when the issue is fixed")
     except RuntimeError as exc:
         print_error(f"LLM call failed: {exc}")
+        raw_dir = config.paths.data_dir / "raw_responses"
+        if raw_dir.exists():
+            raws = sorted(raw_dir.glob(f"daily-{day_date}*.txt"))
+            if raws:
+                print_info(f"Partial response saved: {raws[-1]}")
+        print_info("Your session data is safe. Re-run 'track end' to retry.")
+    except Exception as exc:  # noqa: BLE001
+        print_error(f"Unexpected error during analysis: {exc}")
+        print_info("Your session data is safe. Re-run 'track end' to retry.")
 
 
 def _run_weekly_analysis(config: Config, db: Database) -> None:
