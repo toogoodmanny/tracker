@@ -38,7 +38,7 @@ def open_database(db_path: Path) -> sqlite3.Connection:
         logger.error("Failed to initialise database at %s: %s", db_path, exc)
         raise
 
-    logger.info("Database opened at %s (version %d)", db_path, CURRENT_VERSION)
+    logger.debug("Database opened at %s (version %d)", db_path, CURRENT_VERSION)
     return conn
 
 

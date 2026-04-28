@@ -75,6 +75,10 @@ def cli(debug: bool) -> None:
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
         datefmt="%H:%M:%S",
     )
+    # Silence noisy library and internal loggers — not useful to end users
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("tracker.db.connection").setLevel(logging.WARNING)
 
 
 # ---------------------------------------------------------------------------
