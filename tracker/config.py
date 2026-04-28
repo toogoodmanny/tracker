@@ -68,8 +68,9 @@ class PathsConfig:
 @dataclass(frozen=True)
 class ApiConfig:
     anthropic_api_key: str
-    anthropic_model: str    # claude-sonnet-4-5-20250929
-    aw_base_url: str        # http://localhost:5600
+    anthropic_model: str            # claude-sonnet-4-5-20250929 — main analysis
+    screenshot_model: str           # claude-3-5-haiku-20241022 — cheap vision model
+    aw_base_url: str                # http://localhost:5600
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +132,7 @@ def load_config(config_path: Path | None = None) -> Config:
         api=ApiConfig(
             anthropic_api_key=api_key,
             anthropic_model=raw.get("anthropic_model", "claude-sonnet-4-5-20250929"),
+            screenshot_model=raw.get("screenshot_model", "claude-3-5-haiku-20241022"),
             aw_base_url=raw.get("aw_base_url", "http://localhost:5600"),
         ),
     )
@@ -144,6 +146,7 @@ def write_default_config(config_path: Path | None = None) -> Path:
     default: dict = {
         "anthropic_api_key": "",
         "anthropic_model": "claude-sonnet-4-5-20250929",
+        "screenshot_model": "claude-3-5-haiku-20241022",
         "aw_base_url": "http://localhost:5600",
         "data_dir": str(path.parent),
         "projects": _default_projects(),
