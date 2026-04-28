@@ -78,6 +78,7 @@ def cli(debug: bool) -> None:
     # Silence noisy library and internal loggers — not useful to end users
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("anthropic").setLevel(logging.WARNING)
     logging.getLogger("tracker.db.connection").setLevel(logging.WARNING)
 
 
@@ -536,7 +537,7 @@ def _stop_daemon_process(pid: int) -> None:
     """
     try:
         os.kill(pid, signal.SIGTERM)
-        logger.info("Sent SIGTERM to daemon PID %d", pid)
+        logger.debug("Sent SIGTERM to daemon PID %d", pid)
     except ProcessLookupError:
         logger.debug("Daemon PID %d already gone", pid)
     except PermissionError as exc:

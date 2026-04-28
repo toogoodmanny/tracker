@@ -201,7 +201,11 @@ class DailyAnalyser:
         except ImportError as exc:
             raise RuntimeError("anthropic package not installed") from exc
 
-        client = anthropic.Anthropic(api_key=self._config.api.anthropic_api_key)
+        client = anthropic.Anthropic(
+            api_key=self._config.api.anthropic_api_key,
+            max_retries=2,
+            timeout=120.0,  # 2 min — fail fast rather than hanging for hours
+        )
 
         try:
             message = client.messages.create(
@@ -371,7 +375,11 @@ class GoalParser:
             .replace("{user_projects_section}", projects_section)
             .replace("{raw_goals}", raw_goals)
         )
-        client = anthropic.Anthropic(api_key=self._config.api.anthropic_api_key)
+        client = anthropic.Anthropic(
+            api_key=self._config.api.anthropic_api_key,
+            max_retries=2,
+            timeout=30.0,
+        )
 
         message = client.messages.create(
             model=self._config.api.anthropic_model,

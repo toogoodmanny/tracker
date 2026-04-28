@@ -183,7 +183,11 @@ class WeeklyAnalyser:
         except ImportError as exc:
             raise RuntimeError("anthropic package not installed") from exc
 
-        client = anthropic.Anthropic(api_key=self._config.api.anthropic_api_key)
+        client = anthropic.Anthropic(
+            api_key=self._config.api.anthropic_api_key,
+            max_retries=2,
+            timeout=120.0,
+        )
         try:
             message = client.messages.create(
                 model=self._config.api.anthropic_model,
