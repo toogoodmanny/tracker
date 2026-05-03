@@ -1,10 +1,15 @@
 # Tracker
 
-A personal time tracker for people with ADHD (and anyone else who wants brutal honesty about how they spent their day).
+A personal time tracker for anyone who wants brutal honesty about how they spent their day (on their computers).
 
-It runs in the background while you work, captures what you're doing every 30 seconds, and at the end of the day uses an LLM (Claude) to write you a personalized report: where you actually spent your time, what triggered each distraction, how it compared to the goals you set in the morning.
+It runs on your laptop in the background while you work, captures what you're doing every 30 seconds, and at the end of the day uses an LLM (Claude) to write you a personalized report: where you actually spent your time, what triggered each distraction, how it compared to the goals you set in the morning.
+
+It reads what you're typing - to differentiate between Whatsapp messages related to work or timepass, it checks progress on word/google docs, tracks figma screens & frames you're working on, research & browsing topics, youtube videos and reddit etc. It takes screenshots to visually analyze when it doesn't understand what you're doing through the various tracking tools. 
+
+At the end of the day you get a timeline to see where you spent your time and what all you did. It can identify work & deepwork as well as drifts & rabbit holes. Hopefully can lead to you being able to catch your distraction patterns. "Whatsapp messages from xyz group led to you reading about geopolitics or Arsenal for 30 mins in the middle of an otherwise promising deepwork session."
 
 It also gives you a **live web dashboard** while you work, where you can see your goals, add subgoals, and watch the timeline update.
+
 
 > **Heads up.** This is a personal tool. It runs locally on your Mac. It does not share your data with anyone — except that the daily/weekly summary is sent to the Anthropic API (Claude) for analysis. You bring your own API key.
 
