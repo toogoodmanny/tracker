@@ -126,16 +126,26 @@ def start() -> None:
     else:
         print_info(f"Goals loaded for today: {existing_goals.raw_input[:80]}...")
 
-    # Check AW is running
+    # Check AW is running — auto-launch it if not
     aw = ActivityWatchClient(config.api.aw_base_url)
     aw_status = aw.check_connectivity()
     if not aw_status.reachable:
-        print_warning(
-            f"ActivityWatch is not running ({aw_status.error}). "
-            "Start it from Applications and re-run 'track start'."
-        )
-        db.close()
-        return
+        print_info("ActivityWatch not running — launching it now…")
+        import subprocess, time as _time
+        subprocess.Popen(["open", "-a", "ActivityWatch"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Give AW up to 15 seconds to start its HTTP server
+        for _ in range(15):
+            _time.sleep(1)
+            aw_status = aw.check_connectivity()
+            if aw_status.reachable:
+                break
+        if not aw_status.reachable:
+            print_warning(
+                "ActivityWatch didn't start in time. "
+                "Open it manually from Applications and re-run 'track start'."
+            )
+            db.close()
+            return
 
     print_info(f"ActivityWatch connected (v{aw_status.version})")
 
