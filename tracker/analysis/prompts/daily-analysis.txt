@@ -20,9 +20,11 @@ The following is a chronological sequence of 30-second snapshots. Each snapshot 
 - page_title: page/tab title
 - text_field_sample: last 300 chars typed in the focused text field (most recent content)
 - word_count / word_count_delta: document word count if a doc was open
-- is_afk: whether user was away from keyboard
-- is_locked: whether screen was locked
 - screenshot_analysis: LLM description of screenshot (only when trigger fired)
+- screen_off: collapsed block of locked/AFK time — {"screen_off": "Xm", "from": "HH:MM", "to": "HH:MM"}
+  CRITICAL: screen_off blocks are NOT app time. Never add screen_off minutes to any app's totals.
+  If the user was on PostHog at 14:00, screen was off 14:00–14:30, then PostHog again at 14:30,
+  PostHog gets 0 minutes for that gap — the 30 min is screen_off time, period.
 
 {snapshots_json}
 

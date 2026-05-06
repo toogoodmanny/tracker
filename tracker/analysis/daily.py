@@ -146,39 +146,59 @@ class DailyAnalyser:
         return f"Raw input: {goals.raw_input}\n\nParsed: {goals.parsed_json or 'not parsed'}"
 
     def _format_snapshots(self, snapshots: list[Snapshot]) -> str:
-        """Convert snapshots to compact JSON, capped at 200 snapshots to fit context."""
-        # Sample evenly if too many
-        if len(snapshots) > 200:
-            step = len(snapshots) // 200
-            snapshots = snapshots[::step][:200]
+        """
+        Convert snapshots to compact JSON for the LLM prompt.
 
-        rows = []
-        for s in snapshots:
-            row: dict[str, Any] = {
-                "t": s.timestamp.strftime("%H:%M:%S"),
-                "app": s.app_name,
-                "title": s.window_title,
-            }
-            if s.url:
-                row["url"] = s.url
-                reddit = _parse_reddit_url(s.url, s.page_title)
-                if reddit is not None:
-                    row["reddit"] = reddit
-            if s.page_title:
-                row["page"] = s.page_title
-            if s.text_field_sample:
-                row["typed"] = s.text_field_sample[-200:]
-            if s.word_count is not None:
-                row["wc"] = s.word_count
-            if s.word_count_delta:
-                row["wc_delta"] = s.word_count_delta
-            if s.is_locked:
-                row["locked"] = True
-            if s.is_afk:
-                row["afk"] = True
-            if s.screenshot_analysis:
-                row["screenshot"] = s.screenshot_analysis
-            rows.append(row)
+        Locked / AFK runs are collapsed into a single {"screen_off": "Xm", "from": ..., "to": ...}
+        marker so the LLM can never accidentally add screen-off time to an adjacent app's totals.
+        Active snapshots are capped at 200 after stripping the screen-off blocks.
+        """
+        import itertools
+
+        poll_s = 30  # daemon poll interval
+
+        rows: list[dict[str, Any]] = []
+        for is_off, group in itertools.groupby(
+            snapshots, key=lambda s: bool(s.is_locked or s.is_afk)
+        ):
+            group_list = list(group)
+            if is_off:
+                # Collapse the whole run into one marker
+                duration_m = round(len(group_list) * poll_s / 60)
+                if duration_m >= 1:
+                    rows.append({
+                        "screen_off": f"{duration_m}m",
+                        "from": group_list[0].timestamp.strftime("%H:%M"),
+                        "to": group_list[-1].timestamp.strftime("%H:%M"),
+                    })
+            else:
+                # Even sample active snapshots if there are too many
+                active = group_list
+                if len(active) > 200:
+                    step = len(active) // 200
+                    active = active[::step][:200]
+                for s in active:
+                    row: dict[str, Any] = {
+                        "t": s.timestamp.strftime("%H:%M:%S"),
+                        "app": s.app_name,
+                        "title": s.window_title,
+                    }
+                    if s.url:
+                        row["url"] = s.url
+                        reddit = _parse_reddit_url(s.url, s.page_title)
+                        if reddit is not None:
+                            row["reddit"] = reddit
+                    if s.page_title:
+                        row["page"] = s.page_title
+                    if s.text_field_sample:
+                        row["typed"] = s.text_field_sample[-200:]
+                    if s.word_count is not None:
+                        row["wc"] = s.word_count
+                    if s.word_count_delta:
+                        row["wc_delta"] = s.word_count_delta
+                    if s.screenshot_analysis:
+                        row["screenshot"] = s.screenshot_analysis
+                    rows.append(row)
 
         return json.dumps(rows, ensure_ascii=False)
 

@@ -147,20 +147,42 @@ function renderTimeline(blocks) {
   }
   // Newest first
   const rows = blocks.slice().reverse().map(b => {
+    const isOffScreen = (b.app === 'Locked' || b.app === 'AFK');
     const titlesText = (b.titles || []).join(' · ') || '—';
     const badges = [];
     if (b.text_capture_count) badges.push('✏️ ' + b.text_capture_count);
     if (b.screenshot_count) badges.push('📸 ' + b.screenshot_count);
     if (b.url_count) badges.push('🔗 ' + b.url_count);
     const badgeStr = badges.length ? '<div class="badges">' + badges.join(' · ') + '</div>' : '';
-    const appCls = (b.app === 'Locked' || b.app === 'AFK') ? 'block-app locked' : 'block-app';
+    const appCls = isOffScreen ? 'block-app locked' : 'block-app';
+
+    // For locked/AFK blocks, show an inline note box so user can annotate
+    // what they were actually doing (meeting, lunch, etc.)
+    const noteKey = 'block-note-' + b.start;
+    const savedNote = localStorage.getItem(noteKey) || '';
+    const annotationHtml = isOffScreen ? `
+      <div style="margin-top:4px">
+        <input type="text" class="block-note-input" data-key="${escapeHtml(noteKey)}"
+               value="${escapeHtml(savedNote)}"
+               placeholder="What were you doing? (meeting, lunch, break…)"
+               style="font:inherit;font-size:0.78rem;padding:2px 6px;border:0.5px solid #d8d8d0;
+                      border-radius:4px;background:#fafaf7;width:100%;max-width:320px;color:#555">
+      </div>` : '';
+
     return `<div class="block-row">
       <span class="block-time">${b.start} – ${b.end} <span style="color:#bbb">(${fmtDuration(b.duration_minutes)})</span></span>
       <span class="${appCls}">${escapeHtml(b.app)}</span>
-      <div class="block-titles">${escapeHtml(titlesText)}${badgeStr}</div>
+      <div class="block-titles">${isOffScreen ? '' : escapeHtml(titlesText)}${badgeStr}${annotationHtml}</div>
     </div>`;
   }).join('');
   el.innerHTML = rows;
+
+  // Save note annotations to localStorage on change
+  el.querySelectorAll('.block-note-input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      localStorage.setItem(inp.dataset.key, inp.value);
+    });
+  });
 }
 
 function renderGoalsWithSubs(goalsWithSubs) {
