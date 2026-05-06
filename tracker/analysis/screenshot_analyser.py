@@ -179,10 +179,7 @@ class ScreenshotAnalyser:
 
         # Submit batch
         batch = client.messages.batches.create(requests=requests)
-        logger.info(
-            "Screenshot batch submitted: %d images, batch_id=%s",
-            len(requests), batch.id,
-        )
+        logger.debug("Screenshot batch submitted: %d images, id=%s", len(requests), batch.id)
 
         # Poll until ended or timeout
         deadline = time.monotonic() + BATCH_TIMEOUT_S
@@ -190,8 +187,6 @@ class ScreenshotAnalyser:
             batch = client.messages.batches.retrieve(batch.id)
             if batch.processing_status == "ended":
                 break
-            logger.debug("Batch %s status: %s — polling again in %ds",
-                         batch.id, batch.processing_status, int(BATCH_POLL_INTERVAL_S))
             time.sleep(BATCH_POLL_INTERVAL_S)
         else:
             raise RuntimeError(
@@ -200,15 +195,15 @@ class ScreenshotAnalyser:
 
         # Process results
         analysed = skipped = input_tokens = output_tokens = 0
+        errors: list[str] = []
         for result in client.messages.batches.results(batch.id):
             snap = snap_map.get(result.custom_id)
             if snap is None:
                 continue
             if result.result.type != "succeeded":
-                logger.warning(
-                    "Batch screenshot failed for %s: %s",
-                    result.custom_id, result.result,
-                )
+                err = getattr(getattr(result.result, "error", None), "error", result.result)
+                errors.append(str(err)[:80])
+                logger.debug("Batch item failed (%s): %s", result.custom_id, err)
                 skipped += 1
                 continue
             message = result.result.message
@@ -224,11 +219,14 @@ class ScreenshotAnalyser:
                 input_tokens += getattr(usage, "input_tokens", 0)
                 output_tokens += getattr(usage, "output_tokens", 0)
 
-        logger.info(
-            "Screenshot batch done: %d analysed, %d skipped, "
-            "%d in / %d out tokens (50%% batch discount applied)",
-            analysed, skipped, input_tokens, output_tokens,
-        )
+        if skipped and not analysed and errors:
+            # All failed — surface one concise warning so user knows why
+            logger.warning("Screenshot analysis: all %d failed — %s", skipped, errors[0])
+        else:
+            logger.debug(
+                "Screenshots: %d analysed, %d skipped, %d/%d tokens",
+                analysed, skipped, input_tokens, output_tokens,
+            )
         return ScreenshotAnalysisResult(analysed, skipped, input_tokens, output_tokens)
 
     # ------------------------------------------------------------------
@@ -256,9 +254,9 @@ class ScreenshotAnalyser:
             input_tokens += in_tok
             output_tokens += out_tok
 
-        logger.info(
-            "Screenshot sync: %d analysed, %d skipped, %d in / %d out tokens",
-            analysed, skipped, input_tokens, output_tokens,
+        logger.debug(
+            "Screenshots (sync): %d analysed, %d skipped",
+            analysed, skipped,
         )
         return ScreenshotAnalysisResult(analysed, skipped, input_tokens, output_tokens)
 

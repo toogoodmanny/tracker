@@ -132,7 +132,7 @@ def load_config(config_path: Path | None = None) -> Config:
         api=ApiConfig(
             anthropic_api_key=api_key,
             anthropic_model=raw.get("anthropic_model", "claude-sonnet-4-5-20250929"),
-            screenshot_model=raw.get("screenshot_model", "claude-3-5-haiku-20241022"),
+            screenshot_model=raw.get("screenshot_model", raw.get("anthropic_model", "claude-sonnet-4-5-20250929")),
             aw_base_url=raw.get("aw_base_url", "http://localhost:5600"),
         ),
     )
