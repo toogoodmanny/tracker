@@ -554,6 +554,31 @@ def _stop_daemon_process(pid: int) -> None:
         logger.warning("Cannot stop daemon PID %d: %s", pid, exc)
 
 
+def _collect_post_report_corrections(db: Database, day_date: datetime.date) -> None:
+    """
+    After the report opens, give the user a chance to note anything the
+    tracker got wrong. Each non-empty line becomes a Correction record,
+    which feeds into the weekly analysis and future CLAUDE.md updates.
+    """
+    print()
+    print_info("Anything the tracker got wrong? (one correction per line, blank line to finish)")
+    while True:
+        try:
+            line = input("  > ").strip()
+        except (EOFError, KeyboardInterrupt):
+            break
+        if not line:
+            break
+        correction = Correction(
+            day_date=day_date,
+            correction_note=line,
+            corrected_classification="post_report",
+        )
+        db.corrections.insert(correction)
+        print_info("  Noted ✓")
+    print()
+
+
 def _run_daily_analysis(
     config: Config,
     db: Database,
@@ -575,6 +600,9 @@ def _run_daily_analysis(
             _sp.run(["open", report_path], check=True, timeout=5)
         except (FileNotFoundError, _sp.CalledProcessError, _sp.TimeoutExpired):
             print_info(f"Open manually: {report_path}")
+
+        # Post-report feedback — let the user correct misclassifications inline
+        _collect_post_report_corrections(db, day_date)
     except ValueError as exc:
         print_error(f"Analysis failed: {exc}")
         print_info("Your session data is safe in ~/.tracker/tracker.db")

@@ -611,6 +611,7 @@ def _build_html_report(analysis: dict[str, Any], day_date: datetime.date) -> str
     score_reasoning = analysis.get("score_reasoning", "")
     stats_panel = _build_stats_panel(analysis.get("_run_stats", {}))
 
+    day_date_iso = day_date.isoformat()
     deep_work_h = round(analysis.get("deep_work_minutes", 0) / 60, 1)
     waste_min = (
         analysis.get("drift_minutes", 0)
@@ -750,6 +751,80 @@ def _build_html_report(analysis: dict[str, Any], day_date: datetime.date) -> str
 <div class="section">
   {stats_panel}
 </div>
+
+<h2>Your feedback</h2>
+<div class="section" id="feedback-section">
+  <p style="font-size:0.82rem;color:#888;margin-bottom:1rem">
+    The tracker gave this day a <strong>{score}/10</strong>.
+    If that feels wrong, tell it why — this gets fed back into future analysis.
+  </p>
+  <div style="display:grid;grid-template-columns:auto 1fr;gap:1rem;align-items:start;margin-bottom:0.75rem">
+    <div>
+      <label style="display:block;font-size:0.78rem;color:#888;margin-bottom:4px">Your score</label>
+      <input type="number" id="fb-score" min="1" max="10" step="0.5" placeholder="—"
+             style="width:72px;font:inherit;font-size:0.9rem;padding:0.4rem 0.5rem;
+                    border:0.5px solid #d8d8d0;border-radius:6px;background:#fafaf7">
+    </div>
+    <div>
+      <label style="display:block;font-size:0.78rem;color:#888;margin-bottom:4px">Why? What did the tracker miss or get wrong?</label>
+      <textarea id="fb-reasoning" rows="3"
+                style="width:100%;font:inherit;font-size:0.85rem;padding:0.5rem 0.65rem;
+                       border:0.5px solid #d8d8d0;border-radius:6px;background:#fafaf7;
+                       resize:vertical;min-height:60px"
+                placeholder="e.g. The 2pm Figma session was a design review not drift. I took a proper lunch break at 1pm which wasn't counted..."></textarea>
+    </div>
+  </div>
+  <div style="margin-bottom:0.75rem">
+    <label style="display:block;font-size:0.78rem;color:#888;margin-bottom:4px">Anything else?</label>
+    <textarea id="fb-other" rows="2"
+              style="width:100%;font:inherit;font-size:0.85rem;padding:0.5rem 0.65rem;
+                     border:0.5px solid #d8d8d0;border-radius:6px;background:#fafaf7;resize:vertical"
+              placeholder="General notes, patterns you noticed, things to try tomorrow..."></textarea>
+  </div>
+  <div style="display:flex;align-items:center;gap:0.75rem">
+    <button onclick="submitFeedback()"
+            style="font:inherit;font-size:0.82rem;padding:0.45rem 0.9rem;
+                   border:0.5px solid #1d9e75;background:#1d9e75;color:#fff;
+                   border-radius:6px;cursor:pointer">Save feedback</button>
+    <span id="fb-status" style="font-size:0.78rem;color:#888"></span>
+  </div>
+</div>
+
+<script>
+async function submitFeedback() {{
+  const score = document.getElementById('fb-score').value.trim();
+  const reasoning = document.getElementById('fb-reasoning').value.trim();
+  const other = document.getElementById('fb-other').value.trim();
+  const status = document.getElementById('fb-status');
+
+  if (!score && !reasoning && !other) {{
+    status.textContent = 'Nothing to save.';
+    return;
+  }}
+
+  status.textContent = 'Saving…';
+  try {{
+    const res = await fetch('http://127.0.0.1:27183/api/feedback', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{
+        day_date: '{day_date_iso}',
+        score_override: score ? parseFloat(score) : null,
+        reasoning: reasoning,
+        other_notes: other,
+      }}),
+    }});
+    if (res.ok) {{
+      status.textContent = '✓ Saved — thank you';
+      status.style.color = '#1d9e75';
+    }} else {{
+      status.textContent = 'Error saving. Is the dashboard running? (track dashboard)';
+    }}
+  }} catch (e) {{
+    status.textContent = 'Could not connect — run \\'track dashboard\\' in terminal, then try again.';
+  }}
+}}
+</script>
 
 </div>
 </body>

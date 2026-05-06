@@ -55,13 +55,14 @@ class WeeklyAnalyser:
         daily_summaries = self._load_daily_summaries(recent_days)
         observations = self._db.observations.get_unused_for_weekly(week_start)
         corrections = self._db.corrections.get_unused_weekly(week_start)
+        feedback = self._db.feedback.get_for_week(week_start)
 
-        # Interactive questions based on patterns
-        questions = self._generate_questions(daily_summaries, corrections)
+        # Interactive questions based on patterns (including feedback patterns)
+        questions = self._generate_questions(daily_summaries, corrections, feedback)
         user_answers = ask_questions_fn(questions)
 
         prompt = self._build_prompt(
-            daily_summaries, observations, corrections, user_answers
+            daily_summaries, observations, corrections, user_answers, feedback
         )
 
         logger.info("Calling Claude API for weekly analysis")
@@ -114,9 +115,33 @@ class WeeklyAnalyser:
         self,
         summaries: list[dict],
         corrections: list[Any],
+        feedback: list[dict] | None = None,
     ) -> list[str]:
         """Generate 3-4 contextual questions for the user."""
         questions = []
+        feedback = feedback or []
+
+        # Surface feedback patterns automatically when they're consistent
+        if feedback:
+            score_gaps = [
+                f["score_override"] - 0  # placeholder — real score comes from summaries
+                for f in feedback
+                if f.get("score_override") is not None
+            ]
+            # If user consistently scored days differently, flag it
+            if len(score_gaps) >= 3:
+                questions.append(
+                    f"You overrode the tracker's score on {len(score_gaps)} days this week. "
+                    "What's the main thing the tracker keeps getting wrong about how you rate your days?"
+                )
+            elif feedback:
+                # Has any feedback at all — surface it
+                topics = [f["reasoning"] for f in feedback if f.get("reasoning")]
+                if topics:
+                    questions.append(
+                        "You left feedback on your daily reports this week. "
+                        "Is there a recurring pattern in what the tracker misses or miscategorises?"
+                    )
 
         if len(corrections) > 3:
             questions.append(
@@ -150,6 +175,7 @@ class WeeklyAnalyser:
         observations: list[Any],
         corrections: list[Any],
         user_answers: dict[str, str],
+        feedback: list[dict] | None = None,
     ) -> str:
         observations_json = json.dumps(
             [{"type": o.observation_type.value, "detail": o.detail, "day": o.day_date.isoformat()}
@@ -161,6 +187,7 @@ class WeeklyAnalyser:
              for c in corrections],
             indent=2,
         )
+        feedback_json = json.dumps(feedback or [], indent=2)
         from tracker.analysis.daily import _build_user_context_section
         user_context_section = _build_user_context_section(self._config)
 
@@ -171,6 +198,7 @@ class WeeklyAnalyser:
             .replace("{observations_json}", observations_json)
             .replace("{corrections_json}", corrections_json)
             .replace("{user_answers}", json.dumps(user_answers, indent=2))
+            .replace("{feedback_json}", feedback_json)
         )
 
     # ------------------------------------------------------------------

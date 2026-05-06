@@ -583,6 +583,44 @@ class SubgoalRepository:
 
 
 # ---------------------------------------------------------------------------
+# Daily feedback
+# ---------------------------------------------------------------------------
+
+class FeedbackRepository:
+    """Stores post-report user feedback (score override + reasoning)."""
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self._conn = conn
+
+    def insert(
+        self,
+        day_date: datetime.date,
+        score_override: float | None,
+        reasoning: str,
+        other_notes: str,
+    ) -> int:
+        with self._conn:
+            cur = self._conn.execute(
+                """INSERT INTO daily_feedback
+                   (day_date, score_override, reasoning, other_notes)
+                   VALUES (?, ?, ?, ?)""",
+                (day_date.isoformat(), score_override,
+                 reasoning or None, other_notes or None),
+            )
+        return cur.lastrowid  # type: ignore[return-value]
+
+    def get_for_week(self, since: datetime.date) -> list[dict]:
+        rows = self._conn.execute(
+            """SELECT day_date, score_override, reasoning, other_notes, created_at
+               FROM daily_feedback
+               WHERE day_date >= ?
+               ORDER BY day_date""",
+            (since.isoformat(),),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
 # Facade — convenient access to all repos from one object
 # ---------------------------------------------------------------------------
 
@@ -601,6 +639,7 @@ class Database:
         self.observations = ObservationRepository(conn)
         self.notes = NoteRepository(conn)
         self.subgoals = SubgoalRepository(conn)
+        self.feedback = FeedbackRepository(conn)
 
     def close(self) -> None:
         try:

@@ -176,8 +176,19 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        # Allow the report HTML (opened as file://) to POST feedback here
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
         self.wfile.write(body)
+
+    def do_OPTIONS(self) -> None:  # noqa: N802
+        """Pre-flight CORS for file:// report pages POSTing feedback."""
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
 
     def _send_html(self, status: int, html: str) -> None:
         body = html.encode("utf-8")
@@ -231,6 +242,27 @@ class _Handler(BaseHTTPRequestHandler):
                     self._send_json(400, {"error": "raw_input required"})
                     return
                 db.goals.upsert(Goal(day_date=today, raw_input=raw))
+                self._send_json(200, {"ok": True})
+                return
+
+            if self.path == "/api/feedback":
+                day_str = (body.get("day_date") or "").strip()
+                try:
+                    day = datetime.date.fromisoformat(day_str) if day_str else today
+                except ValueError:
+                    day = today
+                score_raw = body.get("score_override")
+                try:
+                    score = float(score_raw) if score_raw not in (None, "") else None
+                except (TypeError, ValueError):
+                    score = None
+                reasoning = (body.get("reasoning") or "").strip()
+                other = (body.get("other_notes") or "").strip()
+                if not reasoning and not other and score is None:
+                    self._send_json(400, {"error": "nothing to save"})
+                    return
+                db.feedback.insert(day, score, reasoning, other)
+                logger.info("Feedback saved for %s", day)
                 self._send_json(200, {"ok": True})
                 return
 

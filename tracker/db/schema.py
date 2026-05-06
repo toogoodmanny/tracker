@@ -7,7 +7,7 @@ Schema version is tracked in the `schema_version` table.
 
 from __future__ import annotations
 
-CURRENT_VERSION = 2
+CURRENT_VERSION = 3
 
 # ---------------------------------------------------------------------------
 # Table definitions
@@ -111,6 +111,17 @@ CREATE TABLE IF NOT EXISTS subgoals (
 );
 """
 
+CREATE_DAILY_FEEDBACK = """
+CREATE TABLE IF NOT EXISTS daily_feedback (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    day_date        TEXT NOT NULL,
+    score_override  REAL,
+    reasoning       TEXT,
+    other_notes     TEXT,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+"""
+
 # ---------------------------------------------------------------------------
 # Index definitions
 # ---------------------------------------------------------------------------
@@ -137,5 +148,6 @@ ALL_CREATE_STATEMENTS: list[str] = [
     CREATE_OBSERVATIONS,
     CREATE_NOTES,
     CREATE_SUBGOALS,
+    CREATE_DAILY_FEEDBACK,
     *INDEXES,
 ]
