@@ -823,26 +823,32 @@ async function submitFeedback() {{
   }}
 
   status.textContent = 'Saving…';
-  try {{
-    const res = await fetch('http://127.0.0.1:27183/api/feedback', {{
-      method: 'POST',
-      headers: {{'Content-Type': 'application/json'}},
-      body: JSON.stringify({{
-        day_date: '{day_date_iso}',
-        score_override: score ? parseFloat(score) : null,
-        reasoning: reasoning,
-        other_notes: other,
-      }}),
-    }});
-    if (res.ok) {{
-      status.textContent = '✓ Saved — thank you';
-      status.style.color = '#1d9e75';
-    }} else {{
-      status.textContent = 'Error saving. Is the dashboard running? (track dashboard)';
+  const payload = JSON.stringify({{
+    day_date: '{day_date_iso}',
+    score_override: score ? parseFloat(score) : null,
+    reasoning: reasoning,
+    other_notes: other,
+  }});
+
+  // Try dedicated feedback server (27184, always started by track end),
+  // then fall back to dashboard server (27183, running if track dashboard is open)
+  for (const port of [27184, 27183]) {{
+    try {{
+      const res = await fetch(`http://127.0.0.1:${{port}}/api/feedback`, {{
+        method: 'POST',
+        headers: {{'Content-Type': 'application/json'}},
+        body: payload,
+      }});
+      if (res.ok) {{
+        status.textContent = '✓ Saved — thank you';
+        status.style.color = '#1d9e75';
+        return;
+      }}
+    }} catch (_) {{
+      // try next port
     }}
-  }} catch (e) {{
-    status.textContent = 'Could not connect — run \\'track dashboard\\' in terminal, then try again.';
   }}
+  status.textContent = 'Could not save — re-run track end to restart the feedback server.';
 }}
 </script>
 

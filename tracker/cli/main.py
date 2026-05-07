@@ -554,6 +554,42 @@ def _stop_daemon_process(pid: int) -> None:
         logger.warning("Cannot stop daemon PID %d: %s", pid, exc)
 
 
+def _start_feedback_server(config: Config) -> None:
+    """
+    Spawn a background feedback server so the HTML report can accept feedback
+    via POST without needing `track dashboard` to be running.
+    Kills any previously running feedback server first.
+    """
+    import subprocess as _sp
+    import sys as _sys
+
+    pid_file = config.paths.data_dir / "feedback_server.pid"
+
+    # Terminate any previously running feedback server
+    if pid_file.exists():
+        try:
+            old_pid = int(pid_file.read_text().strip())
+            os.kill(old_pid, signal.SIGTERM)
+        except (ValueError, ProcessLookupError, OSError):
+            pass
+        try:
+            pid_file.unlink()
+        except OSError:
+            pass
+
+    proc = _sp.Popen(
+        [_sys.executable, "-m", "tracker.dashboard.feedback_server",
+         str(config.paths.db_path), "27184"],
+        stdout=_sp.DEVNULL,
+        stderr=_sp.DEVNULL,
+        start_new_session=True,   # detach from terminal so it survives after track end exits
+    )
+    try:
+        pid_file.write_text(str(proc.pid))
+    except OSError:
+        pass
+
+
 def _collect_post_report_corrections(db: Database, day_date: datetime.date) -> None:
     """
     After the report opens, give the user a chance to note anything the
@@ -595,14 +631,15 @@ def _run_daily_analysis(
         report_path = analyser.run(session_id=session_id, day_date=day_date)
         db.sessions.close_session(session_id, datetime.datetime.now(), report_path)
         print_success(f"Report saved: {report_path}")
+        # Start background feedback server so report HTML can POST feedback
+        # regardless of whether `track dashboard` is running
+        _start_feedback_server(config)
+
         # Open in default browser
         try:
             _sp.run(["open", report_path], check=True, timeout=5)
         except (FileNotFoundError, _sp.CalledProcessError, _sp.TimeoutExpired):
             print_info(f"Open manually: {report_path}")
-
-        # Post-report feedback — let the user correct misclassifications inline
-        _collect_post_report_corrections(db, day_date)
     except ValueError as exc:
         print_error(f"Analysis failed: {exc}")
         print_info("Your session data is safe in ~/.tracker/tracker.db")
